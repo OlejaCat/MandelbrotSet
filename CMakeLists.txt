@@ -22,10 +22,10 @@ set(EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/bin)
 set(CMAKE_STATIC_LIBRARY_PREFIX "")
 set(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/lib)
 
-set(CMAKE_CXX_FLAGS "-Wall -Wextra -pedantic")
+set(CMAKE_CXX_FLAGS "-Wall -Wextra -pedantic -mavx2")
 
 set(CMAKE_CXX_FLAGS_DEBUG "-fsanitize=undefined -fsanitize=address -O0 -g")
-set(CMAKE_CXX_FLAGS_RELEASE "-O2")
+set(CMAKE_CXX_FLAGS_RELEASE "-O3")
 
 include_directories(${PROJECT_SOURCE_DIR}/include)
 
