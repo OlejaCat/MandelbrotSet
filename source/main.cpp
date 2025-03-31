@@ -8,8 +8,8 @@
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>
 
-#include "constants.h"
-#include "mandelbrot_logic.h"
+#include "screen_constants.h"
+#include "mandelbrot_start.h"
 
 
 int main()
