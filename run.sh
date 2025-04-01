@@ -1,3 +1,3 @@
 #!/bin/bash
 
-./bin/mandel.out $@
+./build/source/mandel $@

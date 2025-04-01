@@ -8,6 +8,7 @@
 #include "screen_constants.h"
 #include "mandelbrot_logic_basic.h"
 #include "mandelbrot_logic_intrinsics.h"
+#include "mandelbrot_logic_array.h"
 
 
 // static ----------------------------------------------------------------------
@@ -54,8 +55,9 @@ int startMandelbrot(SDL_Renderer* renderer, SDL_Texture* texture)
 
         SDL_LockTexture(texture, NULL, (void**)&pixels, &pitch);
 
-        calculateMandelbrot(pitch, pixels, format, &mandelbrot_data);
+        // calculateMandelbrot(pitch, pixels, format, &mandelbrot_data);
         // calculateMandelbrotIntrinsics(pitch, pixels, format, &mandelbrot_data);
+        calculateMandelbrotArray(pitch, pixels, format, &mandelbrot_data);
 
         SDL_UnlockTexture(texture);
         SDL_RenderTexture(renderer, texture, NULL, NULL);
@@ -100,11 +102,11 @@ static void handleInput(SDL_Event* event, MandelbrotData* data)
                 break;
 
             case SDLK_DOWN:
-                data->center_y -= data->height * MOVE_SPEED;
+                data->center_y += data->height * MOVE_SPEED;
                 break;
 
             case SDLK_UP:
-                data->center_y += data->height * MOVE_SPEED;
+                data->center_y -= data->height * MOVE_SPEED;
                 break;
 
             default:
