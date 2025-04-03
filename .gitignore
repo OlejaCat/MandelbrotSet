@@ -1,8 +1,11 @@
-*.o
-bin/
 build/
 CMakeFiles/
 CMakeFiles  
 Makefile
 cmake_install.cmake
 mandel
+
+.venv/
+venv/
+
+results

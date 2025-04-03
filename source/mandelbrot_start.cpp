@@ -2,6 +2,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <assert.h>
 
 #include "mandelbrot_utils.h"
@@ -14,58 +15,88 @@
 // static ----------------------------------------------------------------------
 
 
+typedef void (*MandelbrotFunction)(int pitch, uint32_t* pixels, MandelbrotData* data);
+
 static void handleInput(SDL_Event* event, MandelbrotData* data);
 
 
 // public ---------------------------------------------------------------------
 
 
-int startMandelbrot(SDL_Renderer* renderer, SDL_Texture* texture)
+int startMandelbrot(int argc, char* argv[],
+                    SDL_Renderer* renderer, 
+                    SDL_Texture*  texture)
 {
     assert(renderer != NULL);
     assert(texture  != NULL);
 
-    uint32_t* pixels = NULL;
-    int pitch = 0;
+    MandelbrotFunction mandelbrot_func = calculateMandelbrotIntrinsics;
+    if (argc == 2)
+    {
+        if (!strcmp(argv[1], "--basic"))
+        {
+            mandelbrot_func = calculateMandelbrot; 
+        }
+        else if (!strcmp(argv[1], "--basic-separated"))
+        {
+            mandelbrot_func = calculateMandelbrotSeparate; 
+        }
+        else if (!strcmp(argv[1], "--array"))
+        {
+            mandelbrot_func = calculateMandelbrotArray;
+        }
+        else if (!strcmp(argv[1], "--simd"))
+        {
+            mandelbrot_func = calculateMandelbrotIntrinsics; 
+        }
+        else
+        {
+            printf("Вы ничего не выбрали... значит будет самая быстрая версия\n");
+        }
+    }
 
-    const SDL_PixelFormatDetails* format = NULL;
-    format = SDL_GetPixelFormatDetails(SDL_PIXELFORMAT_RGBA32);
+    uint32_t* pixels = (uint32_t*)SDL_aligned_alloc(32, SCREEN_WIDTH * SCREEN_HEIGHT * 4);
+    int pitch = SCREEN_WIDTH * sizeof(uint32_t);
 
     MandelbrotData mandelbrot_data = {};
     setDefaultMandelbrot(&mandelbrot_data);
 
     bool done = false;
-    uint64_t start_time = 0;
-    double fps = 0;
-    uint64_t frame_time = 0;
+    //uint64_t start_time = 0;
+    //double fps = 0;
+    //uint64_t frame_time = 0;
     while (!done)
     {
         SDL_Event event; 
 
         while (SDL_PollEvent(&event))
         {
-            if (event.type == SDL_EVENT_QUIT) 
+            if (event.type    == SDL_EVENT_QUIT
+             || event.key.key == SDLK_Q) 
             {
                 done = true; 
             }
             handleInput(&event, &mandelbrot_data);
         }
 
-        start_time = SDL_GetTicks();
+        //start_time = SDL_GetTicks();
 
-        SDL_LockTexture(texture, NULL, (void**)&pixels, &pitch);
+        mandelbrot_func(pitch, pixels, &mandelbrot_data);
+        if (!SDL_UpdateTexture(texture, NULL, pixels, pitch)) 
+        {
+            printf("Texture update failed: %s\n", SDL_GetError());
+        }
 
-        // calculateMandelbrot(pitch, pixels, format, &mandelbrot_data);
-        // calculateMandelbrotIntrinsics(pitch, pixels, format, &mandelbrot_data);
-        calculateMandelbrotArray(pitch, pixels, format, &mandelbrot_data);
-
-        SDL_UnlockTexture(texture);
         SDL_RenderTexture(renderer, texture, NULL, NULL);
         SDL_RenderPresent(renderer);
 
-        frame_time = SDL_GetTicks() - start_time;
-        fps = (frame_time > 0) ? 1000.0f / frame_time : 0.0f;
+        //frame_time = SDL_GetTicks() - start_time;
+        //fps = (frame_time > 0) ? 1000.0f / frame_time : 0.0f;
+        //printf("%.1f\n", fps);
     }
+
+    free(mandelbrot_data.iterations_per_pixel);
+    SDL_aligned_free(pixels);
 
     return 0;
 }
@@ -102,11 +133,11 @@ static void handleInput(SDL_Event* event, MandelbrotData* data)
                 break;
 
             case SDLK_DOWN:
-                data->center_y += data->height * MOVE_SPEED;
+                data->center_y -= data->height * MOVE_SPEED;
                 break;
 
             case SDLK_UP:
-                data->center_y -= data->height * MOVE_SPEED;
+                data->center_y += data->height * MOVE_SPEED;
                 break;
 
             default:
@@ -117,8 +148,8 @@ static void handleInput(SDL_Event* event, MandelbrotData* data)
     {
         if (event->button.button == SDL_BUTTON_LEFT) 
         {
-            float mouse_x, 
-                  mouse_y; 
+            float mouse_x;
+            float mouse_y; 
             SDL_GetMouseState(&mouse_x, &mouse_y);
 
             double norm_x = (mouse_x / (double)SCREEN_WIDTH) * data->width;

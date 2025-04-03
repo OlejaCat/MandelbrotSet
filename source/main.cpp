@@ -12,7 +12,7 @@
 #include "mandelbrot_start.h"
 
 
-int main()
+int main(int argc, char* argv[])
 {
     if(!SDL_Init(SDL_INIT_VIDEO))
     {
@@ -61,7 +61,7 @@ int main()
         return 1;
     }
 
-    int return_code = startMandelbrot(renderer, texture);
+    int return_code = startMandelbrot(argc, argv, renderer, texture);
     if (return_code)
     {
         fprintf(stderr, "Error while calculating mandelbrot set\n");

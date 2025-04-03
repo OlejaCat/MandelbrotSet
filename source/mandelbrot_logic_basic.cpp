@@ -2,6 +2,7 @@
 
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>
+
 #include <assert.h>
 #include <math.h>
 
@@ -12,9 +13,10 @@
 // static ---------------------------------------------------------------------
 
 
-static int calculateColorFromPosition(int x, int y, MandelbrotData* data);
-static uint32_t getColorFromIteration(int iterations, 
-                               const SDL_PixelFormatDetails* format);
+static int calculateColors(int pitch, uint32_t* pixels, MandelbrotData* data);
+static int calculateIterationFromPosition(int x_pixel, 
+                                          int y_pixel, 
+                                          MandelbrotData* data);
 
 
 // public ---------------------------------------------------------------------
@@ -22,20 +24,49 @@ static uint32_t getColorFromIteration(int iterations,
 
 void calculateMandelbrot(int pitch, 
                          uint32_t* pixels,
-                         const SDL_PixelFormatDetails* format,
                          MandelbrotData* data)
 {
     assert(pixels != NULL);
-    assert(format != NULL);
     assert(data   != NULL);
+
+    int pitch_u32 = pitch / sizeof(uint32_t);
+    uint32_t* palette = data->colors;
 
     for (int y = 0; y < SCREEN_HEIGHT; y++)
     {
         for (int x = 0; x < SCREEN_WIDTH; x++) 
         {
-            int round = calculateColorFromPosition(x, y, data);
-            uint32_t color = getColorFromIteration(round, format);
-            pixels[y * (pitch / 4) + x] = color;
+            int iterations = calculateIterationFromPosition(x, y, data);
+            pixels[y * pitch_u32 + x] = palette[iterations % MAX_ITERATIONS];
+        }
+    }
+}
+
+
+void calculateMandelbrotSeparate(int pitch,
+                                 uint32_t* pixels,
+                                 MandelbrotData* data)
+{
+    assert(data   != NULL);
+    assert(pixels != NULL);
+
+    calculateIterationField(data);
+    calculateColors(pitch, pixels, data);
+}
+
+
+void calculateIterationField(MandelbrotData* data)
+{
+    assert(data != NULL);
+
+    int* field = data->iterations_per_pixel;
+    
+    for (int y = 0; y < SCREEN_HEIGHT; y++)
+    {
+        for (int x = 0; x < SCREEN_WIDTH; x++) 
+        {
+            int iterations = calculateIterationFromPosition(x, y, data);
+            field[y * SCREEN_WIDTH + x] = iterations % MAX_ITERATIONS;
         }
     }
 }
@@ -44,9 +75,30 @@ void calculateMandelbrot(int pitch,
 // static ---------------------------------------------------------------------
 
 
-static int calculateColorFromPosition(int x_pixel, 
-                                      int y_pixel, 
-                                      MandelbrotData* data)
+static int calculateColors(int pitch, uint32_t* pixels, MandelbrotData* data)
+{
+    assert(data != NULL);
+
+    int* field = data->iterations_per_pixel;
+    uint32_t* palette = data->colors;
+    int pitch_u32 = pitch / sizeof(uint32_t);
+
+    for (int y = 0; y < SCREEN_HEIGHT; y++)
+    {
+        for (int x = 0; x < SCREEN_WIDTH; x++)
+        {
+            int iterations = field[y * SCREEN_WIDTH + x];
+            pixels[y * pitch_u32 + x] = palette[iterations % MAX_ITERATIONS];
+        }
+    }
+
+    return 0;
+}
+
+
+static int calculateIterationFromPosition(int x_pixel, 
+                                          int y_pixel, 
+                                          MandelbrotData* data)
 {
     assert(data != NULL);
 
@@ -55,62 +107,26 @@ static int calculateColorFromPosition(int x_pixel,
 
     const double x0 = norm_x - (data->width / 2) + data->center_x;
     const double y0 = norm_y - (data->height / 2) + data->center_y;
-    double X2 = 0.0;
-    double Y2 = 0.0;
-
-    double X = 0.0;
-    double Y = 0.0;
-
-    double W = 0.0;
+    
+    double x2 = 0.0;
+    double y2 = 0.0;
+    double w = 0.0;
 
     int iteration = 0;
-    while (X2 + Y2 <= 4 && iteration < MAX_ITERATIONS)
+    while (x2 + y2 <= 4.0 && iteration < MAX_ITERATIONS)
     {
-        X = X2 - Y2 + x0;
-        Y = W - X2 - Y2 + y0;
-        X2 = X * X;
-        Y2 = Y * Y;
-        W = (X + Y) * (X + Y);
+        double x = x2 - y2 + x0;
+        double y = w - x2 - y2 + y0;
+
+        w = (x + y) * (x + y);
+
+        x2 = x * x;
+        y2 = y * y;
+
         iteration++;
     }
     
     return iteration;
 }         
 
-
-static uint32_t getColorFromIteration(int iterations, const SDL_PixelFormatDetails* format) 
-{
-    assert(format != NULL);
-
-    if (iterations >= MAX_ITERATIONS)
-    {
-        return SDL_MapRGBA(format, NULL, 0, 0, 0, 255);
-    }
-    
-    double t = (double)iterations / MAX_ITERATIONS;
-
-    t = pow(t, 0.5);
-
-    uint8_t r, g, b;
-    if (t < 0.25) {
-        r = 50;
-        g = 4 * t * 255;
-        b = 255;
-    } else if (t < 0.5) {
-        r = 50;
-        g = 255;
-        b = 255 - 4 * (t - 0.25) * 255;
-    } else if (t < 0.75) {
-        r = 4 * (t - 0.5) * 255;
-        g = 255;
-        b = 50;
-    } else {
-        r = 255;
-        g = 255 - 4 * (t - 0.75) * 255;
-        b = 50;
-    }
-
-    uint32_t color = SDL_MapRGBA(format, NULL, r, g, b, 255);
-    return color;
-}
 

@@ -8,7 +8,10 @@
 
 void calculateMandelbrot(int pitch, 
                          uint32_t* pixels,
-                         const SDL_PixelFormatDetails* format,
                          MandelbrotData* data);
+void calculateMandelbrotSeparate(int pitch,
+                                 uint32_t* pixels,
+                                 MandelbrotData* data);
+void calculateIterationField(MandelbrotData* data);
 
 #endif

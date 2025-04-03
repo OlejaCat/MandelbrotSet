@@ -9,7 +9,6 @@
 
 void calculateMandelbrotArray(int pitch, 
                               uint32_t* pixels,
-                              const SDL_PixelFormatDetails* format,
                               MandelbrotData* data);
 
 #endif

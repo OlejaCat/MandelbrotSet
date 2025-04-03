@@ -1,7 +1,7 @@
 #include "mandelbrot_logic_intrinsics.h"
 
+#include <immintrin.h>
 #include <assert.h>
-#include <math.h>
 
 #include "screen_constants.h"
 #include "mandelbrot_utils.h"
@@ -9,159 +9,131 @@
 
 // static ----------------------------------------------------------------------
 
-static __m256i getColorFromIteration(__m256i iterations, 
-                                     const SDL_PixelFormatDetails* format);
-static __m256i calculateIterationsFromPositionIntrinsics(__m256d x_pixels, 
-                                                         __m256d y_pixels, 
-                                                         MandelbrotData* data);
+
+static __m256i calculateColorsFromIterations(__m128i iter_low, 
+                                                    __m128i iter_high, 
+                                                    MandelbrotData* data);
+static __m128i calculateIterationsFromPositionIntrinsics(__m256d x0, __m256d y0);
+
 
 // public ----------------------------------------------------------------------
 
 
 void calculateMandelbrotIntrinsics(int pitch, 
                                    uint32_t* pixels,
-                                   const SDL_PixelFormatDetails* format,
-                                   MandelbrotData* data)
+                                   MandelbrotData* data) 
 {
-    assert(pixels != NULL);
-    assert(format != NULL);
     assert(data   != NULL);
+    assert(pixels != NULL);
+    assert((uintptr_t)pixels % 32 == 0 && "pixels must be 32-byte aligned");
+    assert((uintptr_t)data->colors % 32 == 0 && "color palette must be 32-byte aligned");
 
-    for (int y = 0; y < SCREEN_HEIGHT; y++)
+    const int pitch_u32 = pitch / sizeof(uint32_t);
+    const double dx = data->width / SCREEN_WIDTH;
+    const double dy = data->height / SCREEN_HEIGHT;
+    const __m256d offset_x = _mm256_set1_pd(data->center_x - data->width / 2);
+
+    for (int y = 0; y < SCREEN_HEIGHT; y++) 
     {
-        for (int x = 0; x < SCREEN_WIDTH; x+=4) 
+        const double norm_y = (SCREEN_HEIGHT - y) * dy - data->height / 2 + data->center_y;
+        const __m256d y0 = _mm256_set1_pd(norm_y);
+        
+        for (int x = 0; x < SCREEN_WIDTH; x += 8) 
         {
-            __m256d x_pixels = _mm256_setr_pd((double)(x),
-                                              (double)(x + 1),
-                                              (double)(x + 2),
-                                              (double)(x + 3));
-            __m256d y_pixels = _mm256_set1_pd((double)y);
-            __m256i iterations = calculateIterationsFromPositionIntrinsics(x_pixels, y_pixels, data);
-            int64_t iterations_array[4] = {};
-            _mm256_store_si256((__m256i*)iterations_array, iterations);
-            for (int x0 = 0; x0 < 4; x0++)
-            {
-                uint32_t color = getColorFromIteration((int)(iterations_array[x0]), format);
-                pixels[y * (pitch / 4) + x + x0] = color;
-            }
+            __m256d x_pixels1 = _mm256_setr_pd(
+                    (double)x, 
+                    (double)(x + 1), 
+                    (double)(x + 2), 
+                    (double)(x + 3)
+            );
+            __m256d x01 = _mm256_fmadd_pd(x_pixels1, _mm256_set1_pd(dx), offset_x);
+            __m128i iter_low = calculateIterationsFromPositionIntrinsics(x01, y0);
+
+            __m256d x_pixels2 = _mm256_setr_pd(
+                    (double)(x + 4), 
+                    (double)(x + 5), 
+                    (double)(x + 6), 
+                    (double)(x + 7)
+            );
+            __m256d x02 = _mm256_fmadd_pd(x_pixels2, _mm256_set1_pd(dx), offset_x);
+            __m128i iter_high = calculateIterationsFromPositionIntrinsics(x02, y0);
+
+            __m256i colors = calculateColorsFromIterations(iter_low, iter_high, data);
+
+            _mm256_storeu_si256((__m256i*)(pixels + y * pitch_u32 + x), colors);
         }
     }
 }
 
 
-static __m256i calculateColorFromPositionIntrinsics(__m256d x_pixels, 
-                                                    __m256d y_pixels, 
-                                                    MandelbrotData* data)
+
+// static ----------------------------------------------------------------------
+
+
+static __m128i calculateIterationsFromPositionIntrinsics(__m256d x0, __m256d y0) 
 {
-    assert(data != NULL);
+    __m256d x2 = _mm256_setzero_pd();
+    __m256d y2 = _mm256_setzero_pd();
+    __m256d w  = _mm256_setzero_pd();
 
-    __m256d mandelbrot_width = _mm256_set1_pd(data->width);
-    __m256d screen_width = _mm256_set1_pd((double)SCREEN_WIDTH);
+    __m256i iterations = _mm256_setzero_si256();
+    const __m256d max_radius = _mm256_set1_pd(4.0);
+    
+    for (int i = 0; i < MAX_ITERATIONS; i++) {
+        __m256d mask = _mm256_cmp_pd(_mm256_add_pd(x2, y2), max_radius, _CMP_LE_OQ);
 
-    __m256d norm_x = _mm256_mul_pd(x_pixels, mandelbrot_width);
-    norm_x = _mm256_div_pd(norm_x, screen_width);
-
-    __m256d mandelbrot_height = _mm256_set1_pd(data->height);
-    __m256d screen_height = _mm256_set1_pd((double)SCREEN_HEIGHT);
-
-    __m256d norm_y = _mm256_sub_pd(screen_height, y_pixels);
-    norm_y = _mm256_mul_pd(norm_y, mandelbrot_height);
-    norm_y = _mm256_div_pd(norm_y, screen_height);
-
-    __m256d twos = _mm256_set1_pd(2.0);
-    mandelbrot_width  = _mm256_div_pd(mandelbrot_width, twos);
-    mandelbrot_height = _mm256_div_pd(mandelbrot_height, twos);
-
-    __m256d center_x = _mm256_set1_pd(data->center_x);
-    __m256d center_y = _mm256_set1_pd(data->center_y);
-
-    __m256d x0 = _mm256_add_pd(norm_x, center_x);
-    x0 = _mm256_sub_pd(x0, mandelbrot_width);
-
-    __m256d y0 = _mm256_add_pd(norm_y, center_y);
-    y0 = _mm256_sub_pd(y0, mandelbrot_height);
-
-    __m256d X2 = _mm256_setzero_pd();
-    __m256d Y2 = _mm256_setzero_pd();
-
-    __m256d X = _mm256_setzero_pd();
-    __m256d Y = _mm256_setzero_pd();
-
-    __m256d W = _mm256_setzero_pd();
-
-    __m256i iteration = _mm256_setzero_si256();
-    __m256d coordinates_sum = _mm256_setzero_pd();
-    __m256d cmp_result = _mm256_setzero_pd();
-    __m256d root_radius = _mm256_setzero_pd();
-    __m256d radius_max = _mm256_set1_pd(4.0f);
-    int64_t mask = 0;
-    for (int i = 0; i < MAX_ITERATIONS; i++)
-    {
-        root_radius = _mm256_add_pd(X2, Y2); 
-        cmp_result = _mm256_cmp_pd(root_radius, radius_max, _CMP_LE_OS);
-        mask = _mm256_movemask_pd(cmp_result);
-
-        if (!mask)
+        if (!_mm256_movemask_pd(mask)) 
         {
             break;
         }
         
-        X = _mm256_sub_pd(X2, Y2);
-        X = _mm256_add_pd(X, x0);
+        __m256d x = _mm256_add_pd(_mm256_sub_pd(x2, y2), x0);
+        __m256d y = _mm256_add_pd(_mm256_sub_pd(_mm256_sub_pd(w, x2), y2), y0);
 
-        Y = _mm256_sub_pd(W, X2);
-        Y = _mm256_sub_pd(Y, Y2);
-        Y = _mm256_add_pd(Y, y0);
+        w = _mm256_mul_pd(_mm256_add_pd(x, y), _mm256_add_pd(x, y));
 
-        X2 = _mm256_mul_pd(X, X);
-        Y2 = _mm256_mul_pd(Y, Y);
+        x2 = _mm256_mul_pd(x, x);
+        y2 = _mm256_mul_pd(y, y);
 
-        coordinates_sum = _mm256_add_pd(X, Y);
-        W = _mm256_mul_pd(coordinates_sum, coordinates_sum);
-
-        iteration = _mm256_sub_epi64(iteration, 
-                                     _mm256_castpd_si256(cmp_result));
+        iterations = _mm256_sub_epi64(iterations, _mm256_castpd_si256(mask));
     }
-    
-    return iteration;
-}         
+
+    __m128i low = _mm256_castsi256_si128(iterations);
+    __m128i high = _mm256_extracti128_si256(iterations, 1);
+
+    return _mm_setr_epi32(
+        _mm_cvtsi128_si32(low),
+        _mm_extract_epi32(low, 2),
+        _mm_cvtsi128_si32(high),
+        _mm_extract_epi32(high, 2)
+    ); 
+}
 
 
-//static __m256i getColorFromIteration(__m256i iterations, const SDL_PixelFormatDetails* format) 
-//{
-//    assert(format != NULL);
-//
-//    if (iterations >= MAX_ITERATIONS)
-//    {
-//        return SDL_MapRGBA(format, NULL, 0, 0, 0, 255);
-//    }
-//    
-//    double t = (double)iterations / MAX_ITERATIONS;
-//
-//    t = pow(t, 0.5);
-//
-//    uint8_t r, g, b;
-//    if (t < 0.25) {
-//        r = 50;
-//        g = 4 * t * 255;
-//        b = 255;
-//    } else if (t < 0.5) {
-//        r = 50;
-//        g = 255;
-//        b = 255 - 4 * (t - 0.25) * 255;
-//    } else if (t < 0.75) {
-//        r = 4 * (t - 0.5) * 255;
-//        g = 255;
-//        b = 50;
-//    } else {
-//        r = 255;
-//        g = 255 - 4 * (t - 0.75) * 255;
-//        b = 50;
-//    }
-//
-//    uint32_t color = SDL_MapRGBA(format, NULL, r, g, b, 255);
-//    return color;
-//}
+static __m256i calculateColorsFromIterations(__m128i iter_low, 
+                                                    __m128i iter_high, 
+                                                    MandelbrotData* data)
+{
+    assert(data != NULL);
 
+    __m256i iterations = _mm256_setr_epi32(
+            _mm_extract_epi32(iter_low, 0),
+            _mm_extract_epi32(iter_low, 1),
+            _mm_extract_epi32(iter_low, 2),
+            _mm_extract_epi32(iter_low, 3),
+            _mm_extract_epi32(iter_high, 0),
+            _mm_extract_epi32(iter_high, 1),
+            _mm_extract_epi32(iter_high, 2),
+            _mm_extract_epi32(iter_high, 3)
+    );
+
+    __m256i colors = _mm256_i32gather_epi32(
+            (const int*)data->colors,
+            _mm256_and_si256(iterations, _mm256_set1_epi32(0x1FF)),
+            sizeof(uint32_t)
+    );
+
+    return colors;
+}
 
 
