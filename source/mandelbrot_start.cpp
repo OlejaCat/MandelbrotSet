@@ -30,24 +30,20 @@ int startMandelbrot(int argc, char* argv[],
     assert(renderer != NULL);
     assert(texture  != NULL);
 
-    MandelbrotFunction mandelbrot_func = calculateMandelbrotIntrinsics;
+    MandelbrotFunction mandelbrot_func = calculateMandelbrotIntrinsicsSeparated;
     if (argc == 2)
     {
         if (!strcmp(argv[1], "--basic"))
         {
-            mandelbrot_func = calculateMandelbrot; 
-        }
-        else if (!strcmp(argv[1], "--basic-separated"))
-        {
-            mandelbrot_func = calculateMandelbrotSeparate; 
+            mandelbrot_func = calculateMandelbrotSeparated; 
         }
         else if (!strcmp(argv[1], "--array"))
         {
-            mandelbrot_func = calculateMandelbrotArray;
+            mandelbrot_func = calculateMandelbrotArraySeparated;
         }
         else if (!strcmp(argv[1], "--simd"))
         {
-            mandelbrot_func = calculateMandelbrotIntrinsics; 
+            mandelbrot_func = calculateMandelbrotIntrinsicsSeparated; 
         }
         else
         {

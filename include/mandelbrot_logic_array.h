@@ -7,8 +7,11 @@
 #include <stdint.h>
 #include "mandelbrot_struct.h"
 
-void calculateMandelbrotArray(int pitch, 
-                              uint32_t* pixels,
-                              MandelbrotData* data);
+void calculateMandelbrotArraySeparated(int pitch,
+                                       uint32_t* pixels,
+                                       MandelbrotData* data);
+void calculateIterationFieldArray(MandelbrotData* data);
+
+
 
 #endif

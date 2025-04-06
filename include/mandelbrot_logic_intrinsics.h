@@ -9,8 +9,9 @@
 
 #include "mandelbrot_struct.h"
 
-void calculateMandelbrotIntrinsics(int pitch, 
-                                   uint32_t* pixels,
-                                   MandelbrotData* data);
+void calculateMandelbrotIntrinsicsSeparated(int pitch,
+                                            uint32_t* pixels,
+                                            MandelbrotData* data);
+void calculateIterationsFieldIntrinsics(MandelbrotData* data);
 
-#endif
+#endif // MANDELBROT_LOGIC_INTRINSICS_H

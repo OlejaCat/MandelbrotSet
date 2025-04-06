@@ -5,7 +5,8 @@
 
 #include "mandelbrot_struct.h"
 
-typedef void (*MandelbrotFunction)(int pitch, uint32_t* pixels, MandelbrotData* data);
+//typedef void (*MandelbrotFunction)(int pitch, uint32_t* pixels, MandelbrotData* data);
+typedef void (*MandelbrotFunction)(MandelbrotData* data);
 
 typedef struct Benchmark
 {

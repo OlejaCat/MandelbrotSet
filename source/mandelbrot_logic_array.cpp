@@ -1,6 +1,7 @@
 #include "mandelbrot_logic_array.h"
 
 #include <stdbool.h>
+#include <stdlib.h>
 #include <assert.h>
 #include <math.h>
 
@@ -57,14 +58,36 @@ static void calculateIterationsArray(double x0[ARRAY_SIZE],
 // public ---------------------------------------------------------------------
 
 
-void calculateMandelbrotArray(int pitch, 
-                              uint32_t* pixels,
-                              MandelbrotData* data)
+void calculateMandelbrotArraySeparated(int pitch,
+                                       uint32_t* pixels,
+                                       MandelbrotData* data)
 {
     assert(pixels != NULL);
     assert(data   != NULL);
 
     int pitch_u32 = pitch / sizeof(uint32_t);
+    int* field = data->iterations_per_pixel;
+
+    calculateIterationFieldArray(data);
+    for (int y = 0; y < SCREEN_HEIGHT; y++)
+    {
+        for (int x = 0; x < SCREEN_WIDTH; x += ARRAY_SIZE) 
+        {
+            for (int i = 0; i < ARRAY_SIZE; i++) 
+            {
+                int iteration = field[y * SCREEN_WIDTH + x + i] % MAX_ITERATIONS;
+                pixels[y * pitch_u32 + x + i] = data->colors[iteration];
+            }
+        }
+    }
+}
+
+
+void calculateIterationFieldArray(MandelbrotData* data)
+{
+    assert(data != NULL);
+
+    int* field = data->iterations_per_pixel;
 
     const double dx = data->width / SCREEN_WIDTH;
     const double dy = data->height / SCREEN_HEIGHT;
@@ -88,11 +111,7 @@ void calculateMandelbrotArray(int pitch,
             }
             
             calculateIterationsArray(x0, y0, iterations);
-            
-            for (int i = 0; i < ARRAY_SIZE; i++) 
-            {
-                pixels[y * pitch_u32 + x + i] = data->colors[iterations[i] % MAX_ITERATIONS];
-            }
+            memcpy(field + y * SCREEN_WIDTH + x, iterations, 4 * ARRAY_SIZE);
         }
     }
 }

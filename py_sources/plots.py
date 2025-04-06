@@ -5,7 +5,12 @@ from matplotlib import pyplot as plt
 
 
 def analyze_mandelbrot(filenames: list[str]):
-    for file in filenames:
+    fig, axes = plt.subplots(1, 2, figsize=(20, 8))
+    plt.subplots_adjust(wspace=0.3)
+
+    for idx, file in enumerate(filenames):
+        ax = axes[idx]
+
         title = ''
         data = []
         with open(file, 'r') as input_file:
@@ -16,34 +21,37 @@ def analyze_mandelbrot(filenames: list[str]):
         std = data.std(ddof=1)
         error = std / np.sqrt(len(data))
 
-        filtered_data = data[(data >= mean - 2 * std) & (data <= mean + 2 * std)]
+        filtered_data = data[(data >= mean - std) & (data <= mean + std)]
 
         print(f"File: {file}")
         print(f"Mean: {mean:.0f} ± {error:.0f} ticks")
         print(f"Percent of filtered data:", end=' ') 
         print(f"{len(filtered_data) / len(data) * 100:.2f}%")
 
+        ax.hist(filtered_data, bins=30, zorder=2)
 
-        plt.figure(figsize=(10, 6))
-        plt.hist(filtered_data, bins=50, zorder=2)
-
-        plt.axvline(
+        ax.axvline(
             mean, 
             color='r', 
             linestyle='--', 
             label=f"Среднее: {mean/1e8:.3f} $\\times$ 10$^{{8}}$",
             zorder=3
         )
-        plt.axvline(mean + 2 * std, color='g', linestyle=':', label='±2σ')
-        plt.axvline(mean - 2 * std, color='g', linestyle=':')
+        ax.axvline(mean + std, color='g', linestyle=':', label='±σ')
+        ax.axvline(mean - std, color='g', linestyle=':')
 
-        plt.ylabel("Плотность")
-        plt.xlabel("Такты процессора")
-        plt.title(title)
-        plt.grid(True, zorder=0, alpha=0.95)
-        plt.legend()
-        plt.savefig(f"{file.rstrip(".txt")}.png", dpi=250)
-        plt.close() 
+        ax.set_ylabel("Плотность")
+        ax.set_xlabel("Такты процессора")
+        ax.set_title(title)
+        ax.set_yscale('log')
+        ax.grid(True, zorder=0, alpha=0.95)
+        ax.legend()
+
+    output_name = f"comprasion_{'_vs_'.join(x.rstrip(".txt").lstrip("results/") for x in filenames)}"
+    plt.tight_layout()
+    plt.savefig(f"{output_name}.png", dpi=300)
+    plt.close() 
+    
 
 
 if __name__ == "__main__":

@@ -6,12 +6,9 @@
 
 #include "mandelbrot_struct.h"
 
-void calculateMandelbrot(int pitch, 
-                         uint32_t* pixels,
-                         MandelbrotData* data);
-void calculateMandelbrotSeparate(int pitch,
-                                 uint32_t* pixels,
-                                 MandelbrotData* data);
+void calculateMandelbrotSeparated(int pitch,
+                                  uint32_t* pixels,
+                                  MandelbrotData* data);
 void calculateIterationField(MandelbrotData* data);
 
 #endif

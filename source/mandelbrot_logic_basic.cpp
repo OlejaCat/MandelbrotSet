@@ -22,30 +22,9 @@ static int calculateIterationFromPosition(int x_pixel,
 // public ---------------------------------------------------------------------
 
 
-void calculateMandelbrot(int pitch, 
-                         uint32_t* pixels,
-                         MandelbrotData* data)
-{
-    assert(pixels != NULL);
-    assert(data   != NULL);
-
-    int pitch_u32 = pitch / sizeof(uint32_t);
-    uint32_t* palette = data->colors;
-
-    for (int y = 0; y < SCREEN_HEIGHT; y++)
-    {
-        for (int x = 0; x < SCREEN_WIDTH; x++) 
-        {
-            int iterations = calculateIterationFromPosition(x, y, data);
-            pixels[y * pitch_u32 + x] = palette[iterations % MAX_ITERATIONS];
-        }
-    }
-}
-
-
-void calculateMandelbrotSeparate(int pitch,
-                                 uint32_t* pixels,
-                                 MandelbrotData* data)
+void calculateMandelbrotSeparated(int pitch,
+                                  uint32_t* pixels,
+                                  MandelbrotData* data)
 {
     assert(data   != NULL);
     assert(pixels != NULL);
@@ -73,27 +52,6 @@ void calculateIterationField(MandelbrotData* data)
 
 
 // static ---------------------------------------------------------------------
-
-
-static int calculateColors(int pitch, uint32_t* pixels, MandelbrotData* data)
-{
-    assert(data != NULL);
-
-    int* field = data->iterations_per_pixel;
-    uint32_t* palette = data->colors;
-    int pitch_u32 = pitch / sizeof(uint32_t);
-
-    for (int y = 0; y < SCREEN_HEIGHT; y++)
-    {
-        for (int x = 0; x < SCREEN_WIDTH; x++)
-        {
-            int iterations = field[y * SCREEN_WIDTH + x];
-            pixels[y * pitch_u32 + x] = palette[iterations % MAX_ITERATIONS];
-        }
-    }
-
-    return 0;
-}
 
 
 static int calculateIterationFromPosition(int x_pixel, 
@@ -128,5 +86,28 @@ static int calculateIterationFromPosition(int x_pixel,
     
     return iteration;
 }         
+
+
+static int calculateColors(int pitch, uint32_t* pixels, MandelbrotData* data)
+{
+    assert(data != NULL);
+
+    int* field = data->iterations_per_pixel;
+    uint32_t* palette = data->colors;
+    int pitch_u32 = pitch / sizeof(uint32_t);
+
+    for (int y = 0; y < SCREEN_HEIGHT; y++)
+    {
+        for (int x = 0; x < SCREEN_WIDTH; x++)
+        {
+            int iterations = field[y * SCREEN_WIDTH + x];
+            pixels[y * pitch_u32 + x] = palette[iterations % MAX_ITERATIONS];
+        }
+    }
+
+    return 0;
+}
+
+
 
 
